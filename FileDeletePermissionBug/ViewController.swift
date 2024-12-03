@@ -17,7 +17,7 @@ class ViewController: UIViewController {
     }
     
     weak var deleteFileButton : UIButton!
-    var latestErrorMessage : UILabel!
+    var latestErrorMessage : UITextView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -55,27 +55,21 @@ class ViewController: UIViewController {
         btnStackView.alignment = .center
         btnStackView.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create a UIScrollView for the error message label
-        let errorScrollView = UIScrollView()
-        errorScrollView.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Create a container view for the error message inside the scroll view
-        let errorContentView = UIView()
-        errorContentView.translatesAutoresizingMaskIntoConstraints = false
-        errorScrollView.addSubview(errorContentView)
-        
-        // Create a label for the error message
-        let latestErrorMessage = UILabel()
+        // Create a text view for the error message
+        let latestErrorMessage = UITextView()
+        latestErrorMessage.font = instructionsLabel.font
         latestErrorMessage.text = ""
-        latestErrorMessage.numberOfLines = 0
-        latestErrorMessage.textAlignment = .left
+        latestErrorMessage.isEditable = false           // Prevent editing
+        latestErrorMessage.isSelectable = true          // Allow text selection
+        latestErrorMessage.isScrollEnabled = true       // Enable scrolling
         latestErrorMessage.translatesAutoresizingMaskIntoConstraints = false
-        errorContentView.addSubview(latestErrorMessage)
+        latestErrorMessage.backgroundColor = .systemBackground
+        latestErrorMessage.textContainerInset = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10) // Add padding
         
         // Add views to the main view
         view.addSubview(instructionsLabel)
         view.addSubview(btnStackView)
-        view.addSubview(errorScrollView)
+        view.addSubview(latestErrorMessage)
         
         // Layout constraints
         NSLayoutConstraint.activate([
@@ -89,30 +83,19 @@ class ViewController: UIViewController {
             btnStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             btnStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             
-            // Scroll view for the error message below the button stack view
-            errorScrollView.topAnchor.constraint(equalTo: btnStackView.bottomAnchor, constant: 20),
-            errorScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            errorScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            errorScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
-            
-            // Content view inside the scroll view
-            errorContentView.topAnchor.constraint(equalTo: errorScrollView.topAnchor),
-            errorContentView.leadingAnchor.constraint(equalTo: errorScrollView.leadingAnchor),
-            errorContentView.trailingAnchor.constraint(equalTo: errorScrollView.trailingAnchor),
-            errorContentView.bottomAnchor.constraint(equalTo: errorScrollView.bottomAnchor),
-            errorContentView.widthAnchor.constraint(equalTo: errorScrollView.widthAnchor),
-            
-            // Error message label inside the content view
-            latestErrorMessage.topAnchor.constraint(equalTo: errorContentView.topAnchor),
-            latestErrorMessage.leadingAnchor.constraint(equalTo: errorContentView.leadingAnchor),
-            latestErrorMessage.trailingAnchor.constraint(equalTo: errorContentView.trailingAnchor),
-            latestErrorMessage.bottomAnchor.constraint(equalTo: errorContentView.bottomAnchor)
+            // Error message text view below the button stack view
+            latestErrorMessage.topAnchor.constraint(equalTo: btnStackView.bottomAnchor, constant: 20),
+            latestErrorMessage.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            latestErrorMessage.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            latestErrorMessage.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20)
         ])
         
         // Store the delete button and latest error message for later use
         self.deleteFileButton = deleteFileButton
         self.latestErrorMessage = latestErrorMessage
     }
+
+
 
     @objc func openFile(_ sender: UIButton) {
         let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.movie, .text, .pdf, .image])
