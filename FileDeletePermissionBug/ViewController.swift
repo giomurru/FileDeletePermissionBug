@@ -9,14 +9,18 @@ import UIKit
 
 class ViewController: UIViewController {
 
+    let temporaryFolderURL = FileManager.default.temporaryDirectory.appendingPathComponent("MyTemporaryFolder")
+    
     var currentItemURL: URL? {
         didSet {
             deleteFileButton?.isEnabled = currentItemURL != nil
+            deleteFolderButton?.isEnabled = currentItemURL != nil
             latestErrorMessage.text = ""
         }
     }
     
     weak var deleteFileButton : UIButton!
+    weak var deleteFolderButton : UIButton!
     var latestErrorMessage : UITextView!
     
     override func viewDidLoad() {
@@ -47,8 +51,16 @@ class ViewController: UIViewController {
         deleteFileButton.addTarget(self, action: #selector(deleteFile), for: .touchUpInside)
         deleteFileButton.translatesAutoresizingMaskIntoConstraints = false
         
+        // Create and configure the "Delete Folder" button
+        let deleteFolderButton = UIButton(type: .system)
+        deleteFolderButton.setTitle("Delete Folder", for: .normal)
+        deleteFolderButton.isEnabled = false
+        deleteFolderButton.addTarget(self, action: #selector(deleteFolder), for: .touchUpInside)
+        deleteFolderButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        
         // Stack view for buttons
-        let btnStackView = UIStackView(arrangedSubviews: [openFileButton, deleteFileButton])
+        let btnStackView = UIStackView(arrangedSubviews: [openFileButton, deleteFolderButton, deleteFileButton])
         btnStackView.axis = .horizontal
         btnStackView.spacing = 20
         btnStackView.distribution = .equalSpacing
@@ -92,6 +104,7 @@ class ViewController: UIViewController {
         
         // Store the delete button and latest error message for later use
         self.deleteFileButton = deleteFileButton
+        self.deleteFolderButton = deleteFolderButton
         self.latestErrorMessage = latestErrorMessage
     }
 
@@ -115,13 +128,23 @@ class ViewController: UIViewController {
             try FileManager.default.removeItem(at: currentItemURL)
             self.currentItemURL = nil
         } catch {
-            errorDeletingFile(error: error as NSError, temporaryItemURL: currentItemURL)
+            errorDeletingItem(error: error as NSError, temporaryItemURL: currentItemURL)
             return
         }
         
     }
     
-    func errorDeletingFile(error: NSError, temporaryItemURL: URL) {
+    @objc func deleteFolder(_ sender: UIButton) {
+        do {
+            try FileManager.default.removeItem(at: temporaryFolderURL)
+        } catch {
+            errorDeletingItem(error: error as NSError, temporaryItemURL: temporaryFolderURL)
+            return
+        }
+        
+    }
+    
+    func errorDeletingItem(error: NSError, temporaryItemURL: URL) {
         let errorDescription = "\(error.localizedDescription)\n\nError code: \(error.code)\n\nError domain: \(error.domain)\n\nError userInfo: \(error.userInfo)"
         latestErrorMessage.text = "ERROR: \(errorDescription)"
     }
@@ -137,7 +160,17 @@ extension ViewController: UIDocumentPickerDelegate {
         
         print("INFO: documentPicker did pick source item at url \(sourceItemURL)")
         
-        let temporaryItemURL = FileManager.default.temporaryDirectory.appendingPathComponent(sourceItemURL.lastPathComponent)
+        
+        if !FileManager.default.fileExists(atPath: temporaryFolderURL.path) {
+            do {
+                try FileManager.default.createDirectory(at: temporaryFolderURL, withIntermediateDirectories: false)
+                print("INFO: MyTemporaryFolder created successfully")
+            } catch {
+                print("ERROR: could not create MyTemporaryFolder: \(error.localizedDescription)")
+            }
+        }
+        
+        let temporaryItemURL = temporaryFolderURL.appendingPathComponent(sourceItemURL.lastPathComponent)
         
         if FileManager.default.fileExists(atPath: temporaryItemURL.path) {
             print("WARNING: Temporary item already exists.")
@@ -145,10 +178,11 @@ extension ViewController: UIDocumentPickerDelegate {
             return
         }
         
-        print("INFO: Trying to copy source item to temporary directory")
+        print("INFO: Copying source item to temporary directory")
         do {
             let securityScoped = sourceItemURL.startAccessingSecurityScopedResource()
             try FileManager.default.copyItem(at: sourceItemURL, to: temporaryItemURL)
+            print("INFO: Source item copied to temporary directory successfully")
             currentItemURL = temporaryItemURL
             if securityScoped {
                 sourceItemURL.stopAccessingSecurityScopedResource()
