@@ -111,7 +111,7 @@ class ViewController: UIViewController {
 
 
     @objc func openFile(_ sender: UIButton) {
-        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.movie, .text, .pdf, .image])
+        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.movie, .text, .pdf, .image], asCopy: false)
         documentPicker.delegate = self
         documentPicker.allowsMultipleSelection = false
         documentPicker.shouldShowFileExtensions = true
@@ -123,9 +123,10 @@ class ViewController: UIViewController {
         guard let currentItemURL = currentItemURL else {
             return
         }
-        
         do {
+            print("INFO: deleting file \(currentItemURL.lastPathComponent)")
             try FileManager.default.removeItem(at: currentItemURL)
+            print("INFO: file \(currentItemURL.lastPathComponent) deleted successfully")
             self.currentItemURL = nil
         } catch {
             errorDeletingItem(error: error as NSError, temporaryItemURL: currentItemURL)
@@ -135,8 +136,14 @@ class ViewController: UIViewController {
     }
     
     @objc func deleteFolder(_ sender: UIButton) {
+        guard currentItemURL != nil else {
+            return
+        }
         do {
+            print("INFO: deleting folder \(temporaryFolderURL.lastPathComponent)")
             try FileManager.default.removeItem(at: temporaryFolderURL)
+            print("INFO: folder \(temporaryFolderURL.lastPathComponent) deleted successfully")
+            self.currentItemURL = nil
         } catch {
             errorDeletingItem(error: error as NSError, temporaryItemURL: temporaryFolderURL)
             return
