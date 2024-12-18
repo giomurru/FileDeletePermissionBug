@@ -10,6 +10,8 @@ import UIKit
 class ViewController: UIViewController {
 
     let temporaryFolderURL = FileManager.default.temporaryDirectory.appendingPathComponent("MyTemporaryFolder")
+    let subTemporaryFolderURL = FileManager.default.temporaryDirectory.appendingPathComponent("MyTemporaryFolder").appendingPathComponent("SubTemporaryFolder")
+
     
     var currentItemURL: URL? {
         didSet {
@@ -21,6 +23,7 @@ class ViewController: UIViewController {
     
     weak var deleteFileButton : UIButton!
     weak var deleteFolderButton : UIButton!
+    weak var immutableFileSwitch : UISwitch!
     var latestErrorMessage : UITextView!
     
     override func viewDidLoad() {
@@ -58,10 +61,34 @@ class ViewController: UIViewController {
         deleteFolderButton.addTarget(self, action: #selector(deleteFolder), for: .touchUpInside)
         deleteFolderButton.translatesAutoresizingMaskIntoConstraints = false
         
+        let immutableFileSwitchLabel = UILabel()
+        immutableFileSwitchLabel.text = "Remove Immutable Flag"
+        immutableFileSwitchLabel.sizeToFit()
+        immutableFileSwitchLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let immutableFileSwitch = UISwitch()
+        immutableFileSwitch.isOn = false
+        immutableFileSwitch.translatesAutoresizingMaskIntoConstraints = false
+        
+        
+        let switchStack = UIStackView(arrangedSubviews: [immutableFileSwitchLabel, immutableFileSwitch])
+        switchStack.axis = .horizontal
+        switchStack.spacing = 10
+        switchStack.distribution = .equalSpacing
+        switchStack.alignment = .center
+        switchStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        
+        let buttonsStack = UIStackView(arrangedSubviews: [openFileButton, deleteFileButton, deleteFolderButton])
+        buttonsStack.axis = .horizontal
+        buttonsStack.spacing = 20
+        buttonsStack.distribution = .equalSpacing
+        buttonsStack.alignment = .center
+        buttonsStack.translatesAutoresizingMaskIntoConstraints = false
         
         // Stack view for buttons
-        let btnStackView = UIStackView(arrangedSubviews: [openFileButton, deleteFolderButton, deleteFileButton])
-        btnStackView.axis = .horizontal
+        let btnStackView = UIStackView(arrangedSubviews: [buttonsStack, switchStack])
+        btnStackView.axis = .vertical
         btnStackView.spacing = 20
         btnStackView.distribution = .equalSpacing
         btnStackView.alignment = .center
@@ -106,9 +133,8 @@ class ViewController: UIViewController {
         self.deleteFileButton = deleteFileButton
         self.deleteFolderButton = deleteFolderButton
         self.latestErrorMessage = latestErrorMessage
+        self.immutableFileSwitch = immutableFileSwitch
     }
-
-
 
     @objc func openFile(_ sender: UIButton) {
         let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.movie, .text, .pdf, .image], asCopy: false)
@@ -124,9 +150,15 @@ class ViewController: UIViewController {
             return
         }
         do {
+            if immutableFileSwitch.isOn {
+                // setting the immutable attribute to false allows us to delete the file and fixes the issue
+                let newPerms = [FileAttributeKey.immutable : false as NSNumber]
+                try FileManager.default.setAttributes(newPerms, ofItemAtPath: currentItemURL.path)
+            }
             print("INFO: deleting file \(currentItemURL.lastPathComponent)")
             try FileManager.default.removeItem(at: currentItemURL)
             print("INFO: file \(currentItemURL.lastPathComponent) deleted successfully")
+            // This fixes the issue with the Operation Not Permitted when deleting the file.
             self.currentItemURL = nil
         } catch {
             errorDeletingItem(error: error as NSError, temporaryItemURL: currentItemURL)
@@ -135,11 +167,37 @@ class ViewController: UIViewController {
         
     }
     
+    func resetImmutableFlag(directoryURL: URL, includeSubdirectories: Bool = true) {
+        do {
+            let files = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+            for f in files {
+                let fileURL = directoryURL.appendingPathComponent(f)
+                var isDirectory : ObjCBool = false
+                if FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &isDirectory) {
+                    if isDirectory.boolValue && includeSubdirectories {
+                        resetImmutableFlag(directoryURL: fileURL, includeSubdirectories: includeSubdirectories)
+                    } else {
+                        let newPerms = [FileAttributeKey.immutable : false as NSNumber]
+                        try FileManager.default.setAttributes(newPerms, ofItemAtPath: fileURL.path)
+                    }
+                }
+            }
+            let newPerms = [FileAttributeKey.immutable : false as NSNumber]
+            try FileManager.default.setAttributes(newPerms, ofItemAtPath: directoryURL.path)
+        } catch {
+            print("ERROR: error resetting immutable flag: \(error.localizedDescription)")
+        }
+    }
+    
     @objc func deleteFolder(_ sender: UIButton) {
         guard currentItemURL != nil else {
             return
         }
         do {
+            if immutableFileSwitch.isOn {
+                // setting the immutable attribute to false allows us to delete the folder and fixes the issue
+                resetImmutableFlag(directoryURL: temporaryFolderURL)
+            }
             print("INFO: deleting folder \(temporaryFolderURL.lastPathComponent)")
             try FileManager.default.removeItem(at: temporaryFolderURL)
             print("INFO: folder \(temporaryFolderURL.lastPathComponent) deleted successfully")
@@ -168,16 +226,16 @@ extension ViewController: UIDocumentPickerDelegate {
         print("INFO: documentPicker did pick source item at url \(sourceItemURL)")
         
         
-        if !FileManager.default.fileExists(atPath: temporaryFolderURL.path) {
+        if !FileManager.default.fileExists(atPath: subTemporaryFolderURL.path) {
             do {
-                try FileManager.default.createDirectory(at: temporaryFolderURL, withIntermediateDirectories: false)
+                try FileManager.default.createDirectory(at: subTemporaryFolderURL, withIntermediateDirectories: true)
                 print("INFO: MyTemporaryFolder created successfully")
             } catch {
                 print("ERROR: could not create MyTemporaryFolder: \(error.localizedDescription)")
             }
         }
         
-        let temporaryItemURL = temporaryFolderURL.appendingPathComponent(sourceItemURL.lastPathComponent)
+        let temporaryItemURL = subTemporaryFolderURL.appendingPathComponent(sourceItemURL.lastPathComponent)
         
         if FileManager.default.fileExists(atPath: temporaryItemURL.path) {
             print("WARNING: Temporary item already exists.")
